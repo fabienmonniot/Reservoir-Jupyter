@@ -11,7 +11,7 @@ class Network(object):
     def __init__(self, trainLen=0, testLen=0, initLen=100) :
         """Initialization of the network. Contains
         default values that can be modified."""
-        
+
         #Data type: "characters", "words", "pixels", "images"
         self.data_type = "characters"
         self.file = self.file = open("text/Shakespeare.txt", "r").read()
@@ -26,13 +26,13 @@ class Network(object):
         self.resSize = 0
 
         #Network formula constants :
-        self.a = 0.3
-        self.spectral_radius = 0.25
+        self.a = 0.75 #0.3
+        self.spectral_radius = 1.25 #0.25
         self.input_scaling = 1.
-        
+
         #Learning parameters
         self.reg =  1e-8 # ridge regression parameters (for offline learning only for the moment)
-        self.learning_rate = 10**-4 #10**-3 # for online learning only
+        self.learning_rate = 10**-3#10**-4 #10**-3 # for online learning only
 
         #Network mode
         self.mode = 'prediction'
@@ -72,7 +72,7 @@ class Network(object):
         self.input_text = list(self.file)
 
         if keep_punctuation == False :
-            self.input_text = [i for i in self.input_text if i in alphabet]     
+            self.input_text = [i for i in self.input_text if i in alphabet]
 
         if keep_numbers == False :
             self.input_text = [i for i in self.input_text if i not in numbers]
@@ -119,7 +119,7 @@ class Network(object):
             raise Exception("The training length (i.e. number of time steps) is lower than the initialization length, should be bigger.")
         self.set_seed()
         self.Win = (np.random.rand(self.resSize,1+self.inSize)-0.5) * self.input_scaling
-        self.W = np.random.rand(self.resSize,self.resSize)-0.5 
+        self.W = np.random.rand(self.resSize,self.resSize)-0.5
         self.X = np.zeros((1+self.inSize+self.resSize,self.trainLen-self.initLen))
         self.Ytarget = self.data_b[self.initLen+1:self.trainLen+1].T
         self.x = np.zeros((self.resSize,1))
@@ -142,7 +142,7 @@ class Network(object):
             self.x = (1-self.a)*self.x + self.a*np.tanh( np.dot(self.Win, np.concatenate((np.array([1]),self.u)).reshape(len(self.input_units)+1,1) ) + np.dot( self.W, self.x ) )
             if t >= self.initLen :
                 #TODO: why do you use x[:,0] ?
-                self.X[:,t-self.initLen] = np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]      
+                self.X[:,t-self.initLen] = np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]
         print('done.')
 
     def train_output(self) :
@@ -152,13 +152,13 @@ class Network(object):
             self.Wout = np.dot(np.dot(self.Ytarget,self.X_T), linalg.inv(np.dot(self.X,self.X_T) + \
                 self.reg*np.eye(1+self.inSize+self.resSize) ) )
         else:
-            self.Wout = np.dot(self.Ytarget, linalg.pinv(self.X) )   
+            self.Wout = np.dot(self.Ytarget, linalg.pinv(self.X) )
         print('done.')
 
     def test(self) :
         print('Testing the network... (', self.mode, ' mode)', sep="", end=" ")
         self.Y = np.zeros((self.outSize,self.testLen))
-        self.u = self.data_b[self.trainLen%len(self.data)] 
+        self.u = self.data_b[self.trainLen%len(self.data)]
         percent = 0.1
         for t in range(self.testLen):
             percent = self.progression(percent, t, self.trainLen)
@@ -166,7 +166,7 @@ class Network(object):
                                                        ) + np.dot(self.W,self.x ) )
             self.y = np.dot(self.Wout, np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0] )
             self.Y[:,t] = self.y
-            if self.mode == 'generative':
+            if self.mode == 'generative' or self.mode == 'generation':
                 # generative mode:
                 self.u = self.y
             elif self.mode == 'prediction':
@@ -187,7 +187,7 @@ class Network(object):
     def probabilities(self, i) :
         """ Provide a vector of probabilities for the character/word output.
         filter0: replacing x<0 by 0, x within [0,+infinity[
-        filter01: replacing x<0 by 0, replacing x>1 by 1, x within [0,1]        
+        filter01: replacing x<0 by 0, replacing x>1 by 1, x within [0,1]
         add_min: scaling all the outputs such as the min value equals 0, x within [0,+infinity[
         max: (does nothing to the values, because we will take the maximum value anyway, so we do not need to compute probabilities)
         """
@@ -211,23 +211,30 @@ class Network(object):
         for i in range(len(self.Y.T)) :
             proba_weights = self.probabilities(i)
             if not self.probamode == "max" :
-                self.output_text += np.random.choice(list(self.output_units), p=proba_weights)
+                # Make a random choice of the next character given the probabilities 'proba_weights'
+                # and add it to the current output "self.output_text"
+                self.output_text += self.output_units[np.random.choice(list(self.output_units), p=proba_weights)]
             else :
+                # Take the most probable next character (i.e. with max probability) given the probabilities 'proba_weights'
+                # and add it to the current output "self.output_text"
                 self.output_text += self.output_units[np.argmax(proba_weights)]
         print("done.")
 
-    def record_output(self) :
+    def record_output(self, verbose=True) :
         print("Saving the output as a text file.")
         record_file = open("out/output"+str(self.current_launch)+".txt", "w")
         record_file.write(self.output_text)
         record_file.close()
+        if verbose:
+            print("Saved generated output text reproduced here:")
+            print(self.output_text)
 
     def words_list(self, existing_words=True, language="EN") :
 
         print("_"*20)
         print("\n  TRIAL NUMBER", self.current_launch+1)
         print("_"*20)
-        
+
         if existing_words == True :
             if language == "EN" : words_dict = open("words_list_EN.txt", "r").read()
             elif language == "FR" : words_dict = open("words_list_FR.txt", "r").read()
@@ -237,7 +244,7 @@ class Network(object):
         self.allwords = "".join([i for i in self.output_text if i in alphabet])
         self.allwords = self.allwords.lower().split()
         words_occurences = Counter(self.allwords)
-        
+
         if existing_words == False :
             print("\nMost common words (real or not) in the generated text", end="\n\n")
             longest_size = len(sorted(list(words_occurences.most_common(self.nb_words)), key=len)[-1])
@@ -245,13 +252,13 @@ class Network(object):
             print("| Occurences ")
             print("-"*(longest_size+17))
             words_occurences = words_occurences.most_common(self.nb_words)
-            
+
             for i in range(self.nb_words) :
                 w = str(words_occurences[i][0])
                 n = str(words_occurences[i][1])
                 print("| " + w + " "*(max(longest_size,3)-len(w)+2) + "| " + n)
             print("-"*(longest_size+17))
-                
+
         else :
             print("\nMost common valid words in the generated text", end="\n\n")
             words_in_dictionary = set(words_dict) & set(self.allwords)
@@ -259,7 +266,7 @@ class Network(object):
             j = 0
             real_words_occurences = []
             words_occurences = words_occurences.most_common()
-            
+
             while i < self.nb_words :
                 if words_occurences[j][0] in words_in_dictionary :
                     real_words_occurences.append(words_occurences[j])
@@ -272,7 +279,7 @@ class Network(object):
             print("| Word", end=" "*(max(longest_size,4)-3))
             print("| Occurences ")
             print("-"*(longest_size+17))
-            
+
             for k in range(i) :
                 w = str(real_words_occurences[k][0])
                 n = str(real_words_occurences[k][1])
@@ -358,11 +365,11 @@ class Network(object):
         while not 0 < self.trainLen :
             print("Training length? (0-", str(len(self.input_text)), ")", sep="", end=" ")
             self.trainLen = int(input())
-        
+
         while not 0 < self.testLen :
             print("Testing length? (0-", str(len(self.input_text)-self.trainLen), ")", sep="", end=" ")
             self.testLen = int(input())
-        
+
         probamodes = ["filter0", "filter01", "add_min", "max"]
         self.probamode = 0
         while self.probamode not in [1, 2, 3, 4] :
@@ -386,31 +393,31 @@ class Network(object):
         while self.predefined_params not in [1, 2] :
             print("Use predefined parameters?\n 1. Yes\n 2. No\n > ", end="")
             self.predefined_params = int(input())
-           
+
         if self.predefined_params == 1:
             self.type = 1
             self.file = open("text/Shakespeare.txt", "r").read()
-            self.mode = 'prediction'
-            self.compute_type = "online"
-            self.filter_characters(False, True, False) # (keep_upper, keep_punctuation, keep_numbers)
-            self.resSize = 10**3
-            self.trainLen = 10**5 #200000
+            self.mode = 'prediction' #'generative'#'prediction'
+            self.compute_type = "online" #""offline"#"online"
+            self.filter_characters(True, True, False) #(False, True, False) # (keep_upper, keep_punctuation, keep_numbers)
+            self.resSize = 800 #10**3
+            self.trainLen = 5*10**5#10**6#10**5 #200000
             self.testLen = 10**3
-            self.probamode = "max"
+            self.probamode = "max" #"filter01" #"max"
             self.launches = 1
             self.nb_words = 50
         else:
             setup_user()
-            
+
         # Adapting initLen to the number of neurons inside the reservoir and the time constant
         # xavier's proposition to set the initial warming-up time for the reservoir
         if self.auto_adapt_initLen:
-            self.initLen = int(np.floor(self.resSize/float(self.a))) 
-            
+            self.initLen = int(np.floor(self.resSize/float(self.a)))
+
 
     def compute_network(self) :
         self.setup()
-        if self.type == 1 :      
+        if self.type == 1 :
             self.characters()
         if self.type == 2 :
             self.words()
@@ -425,33 +432,34 @@ class Network(object):
                 self.train_output()
             elif self.compute_type == "online" :
                 self.train_online()
-            self.test() 
+            self.test()
             self.compute_error()
             self.convert_output()
             self.record_output() # save output in a file
-            if self.type == 1 :
-                self.words_list(existing_words=False)
-                self.words_list(existing_words=True)      
+            # TODO: check what is the purpose of this block self.type ==1
+            # if self.type == 1 :
+            #     self.words_list(existing_words=False)
+            #     self.words_list(existing_words=True)
 
     def train_online(self, verbose=False) :
         '''Update network variable by applying a LMS algo'''
         percent = 0.1 # for the progression
         for t in range(self.trainLen):
 #        for t in range(self.initLen+self.trainLen+self.testLen):
-            self.u = self.data_b[t%len(self.data)] 
-            
+            self.u = self.data_b[t%len(self.data)]
+
             ## update equations of reservoir and output units
             self.x = (1-self.a)*self.x + self.a*np.tanh( np.dot(self.Win, np.concatenate((np.array([1]),self.u)).reshape(len(self.input_units)+1,1) ) + np.dot( self.W, self.x ) )
             percent = self.progression(percent, t, self.trainLen)
-            
+
             if t >= self.initLen : # we finished the "warming period", the reservoir is warm enough (i.e. the "intial transient states" are gone ...hopefully), we can start to train now!!!
                 # In online mode we do not need to save (i.e. concatenate) all the values of x in X
 #                self.X[:,t-self.initLen] = np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]
                 if verbose:
                     print("np.concatenate((np.array([1]), self.u, self.x)).shape ", np.concatenate((np.array([1]), self.u, self.x[:,0])).shape)
                 self.y = np.dot(self.Wout, np.concatenate((np.array([1]), self.u, self.x[:,0])))
-#                np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]  
-                
+#                np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]
+
                 ### compute error and update (reservoir to output) weights
                 ##- compute current error
                 if verbose:
@@ -475,9 +483,9 @@ class Network(object):
 #                self.Wout -= self.learning_rate * np.dot(err.reshape(self.inSize, 1), self.x.reshape(1, self.resSize)) #TODO: check this equation
                 self.Wout -= self.learning_rate * np.dot(err.reshape(self.inSize, 1), np.concatenate((np.array([1]), self.u, self.x[:,0])).reshape(1, self.resSize+self.inSize+1))
 #                np.concatenate((np.array([1]), self.u, self.x))
-                # stop the program if the learning is diverging               
+                # stop the program if the learning is diverging
                 if np.max(err) > 10**9 or np.max(err)=='nan':
-                    raise(Exception, "LMS error is too big (more than 10**42): "+str(err)+". The algorithm is diverging because of a too high learning rate. You should decrease the learning rate !!!")
+                    raise(Exception, "LMS error is too big (more than 10**9): "+str(err)+". The algorithm is diverging because of a too high learning rate. You should decrease the learning rate !!!")
 
 if __name__ == '__main__':
     nw = Network()
