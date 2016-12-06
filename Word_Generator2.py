@@ -14,7 +14,7 @@ class Network(object):
 
         #Data type: "characters", "words", "pixels", "images"
         self.data_type = "characters"
-        self.file = self.file = open("text/Shakespeare.txt", "r").read()
+        self.file = open("text/Shakespeare.txt", "r").read()
 
         #Network lengths:
         self.initLen = initLen # remove the corresponding number of time steps to trainLen
@@ -396,14 +396,14 @@ class Network(object):
 
         if self.predefined_params == 1:
             self.type = 1
-            self.file = open("text/Shakespeare.txt", "r").read()
-            self.mode = 'prediction' #'generative'#'prediction'
-            self.compute_type = "online" #""offline"#"online"
-            self.filter_characters(True, True, False) #(False, True, False) # (keep_upper, keep_punctuation, keep_numbers)
-            self.resSize = 800 #10**3
-            self.trainLen = 5*10**5#10**6#10**5 #200000
+            self.file = open("text/HarryPotter1.txt", 'r').read() #open("text/Shakespeare.txt", "r").read()
+            self.mode = 'generative' #'generative'#'prediction'
+            self.compute_type = "offline" #""offline"#"online"
+            self.filter_characters(False, False, False) #(False, True, False) # (keep_upper, keep_punctuation, keep_numbers)
+            self.resSize = 1500#1500 #500 #10**3
+            self.trainLen = 2*10**6 #5*10**5#10**6#10**5 #200000
             self.testLen = 10**3
-            self.probamode = "max" #"filter01" #"max"
+            self.probamode = "filter01" #"filter01" #"max"
             self.launches = 1
             self.nb_words = 50
         else:
