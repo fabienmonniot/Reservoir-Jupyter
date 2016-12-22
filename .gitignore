@@ -2,7 +2,7 @@
 out/*
 # ipython notebooks (put in comments if real changes are committed,
 #     because otherwise it is saving all the different runs)
-*.ipynb
+#*.ipynb
 
 # Windows image file caches
 Thumbs.db
