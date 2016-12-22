@@ -8,38 +8,21 @@ from collections import Counter
 
 class Network(object):
 
-    def __init__(self, trainLen=0, testLen=0, initLen=100) :
+    def __init__(self):
+    # def __init__(self, initAndTrainLen=0, testLen=0, initLen=100):
         """Initialization of the network. Contains
-        default values that can be modified."""
+        default values that can be modified.
 
-        #Data type: "characters", "words", "pixels", "images"
-        self.data_type = "characters"
-        self.file = open("text/Shakespeare.txt", "r").read()
+        WARNING: initAndTrainLen *includes* initLen and trainLen(i.e. the learning happens on (initAndTrainLen - initLen))
+        """
 
-        #Network lengths:
-        self.initLen = initLen # remove the corresponding number of time steps to trainLen
-        self.trainLen = trainLen # trainLen *includes* initLen (i.e. the learning happens on (trainLen - initLen))
-        self.testLen = testLen
-        self.auto_adapt_initLen = True #will auto-adapt the initLen to the reservoir size and leak rate (a)
-
-        #Network size:
+        # Input lengths:
+        self.initAndTrainLen = 0 # initAndTrainLen *includes* initLen (i.e. the learning happens on (initAndTrainLen - initLen))
+        self.testLen = 0
+        # Reservoir size
         self.resSize = 0
-
-        #Network formula constants :
-        self.a = 0.75 #0.3
-        self.spectral_radius = 1.25 #0.25
-        self.input_scaling = 1.
-
-        #Learning parameters
-        self.reg =  1e-8 # ridge regression parameters (for offline learning only for the moment)
-        self.learning_rate = 10**-3#10**-4 #10**-3 # for online learning only
-
-        #Network mode
-        self.mode = 'prediction'
-        self.compute_type = "offline"
-
-        #Random seed
-        self.seed = None #42
+        # Real setup
+        self._general_setup()
 
     def set_seed(self):
         """Making the seed (for random values) variable if None."""
@@ -103,8 +86,8 @@ class Network(object):
         print("done.")
 
     def binary_data(self) :
-        #TODO: limit size of data_b to the number of characters asked by the user (i.e self.trainLen = self.testLen)
-        #TODO: adapt the modulo(self.trainLen) /self.trainLen in all the code
+        #TODO: limit size of data_b to the number of characters asked by the user (i.e self.initAndTrainLen = self.testLen)
+        #TODO: adapt the modulo(self.initAndTrainLen) /self.initAndTrainLen in all the code
         print("Creating the input binary matrix...", end=" ")
         self.data_b = np.zeros((len(self.input_text), len(self.input_units)))
         for i, item in enumerate(self.data) :
@@ -112,23 +95,44 @@ class Network(object):
         #np.save("inputdata.np", self.data_b)
         print("done.\n")
 
-    def initialization(self) :
+    def initialization(self, verbose=False) :
+        if verbose:
+            print("np.shape(self.data): "+str(np.shape(self.data)))
+            print("np.shape(self.data_b): "+str(np.shape(self.data_b)))
         print("_"*20,"\n\n  LAUNCH NUMBER ", self.current_launch+1,"\n","_"*20,sep="")
         print("\nInitializing the network matrices...", end=" ")
-        if self.trainLen-self.initLen <= 0:
+        if self.initAndTrainLen-self.initLen <= 0:
             raise Exception("The training length (i.e. number of time steps) is lower than the initialization length, should be bigger.")
         self.set_seed()
         self.Win = (np.random.rand(self.resSize,1+self.inSize)-0.5) * self.input_scaling
-        self.W = np.random.rand(self.resSize,self.resSize)-0.5
-        self.X = np.zeros((1+self.inSize+self.resSize,self.trainLen-self.initLen))
-        self.Ytarget = self.data_b[self.initLen+1:self.trainLen+1].T
-        self.x = np.zeros((self.resSize,1))
+        self.W = np.random.rand(self.resSize, self.resSize)-0.5
+        self.X = np.zeros((1+self.inSize+self.resSize, self.initAndTrainLen-self.initLen))
+        # self.Ytarget = self.data_b[self.initLen+1:self.initAndTrainLen+1].T #if several passes are done on data, this leads to an Ytarget to small.
+        self.Ytarget = np.zeros((self.inSize, self.initAndTrainLen-self.initLen))
+        if verbose:
+            print("np.shape(self.X): "+str(np.shape(self.X)))
+            print("np.shape(self.Ytarget): "+str(np.shape(self.Ytarget)))
+        for t in range(self.initLen+1,self.initAndTrainLen+1):
+            # print("t=",str(t), sep=' ')
+            # print("t-self.initLen-1=",str(t-self.initLen-1),sep=' ')
+            self.Ytarget[:,t-self.initLen-1] = self.data_b[t%len(self.data),:].T
+            # if t == 200:
+            #     raise Exception
+        # if verbose:
+        #     print("t=", str(t))
+        #     print("self.Ytarget[:,-1])): "+str(self.Ytarget[:,-1]))
+        #     print("sum(self.Ytarget[:,-1])): "+str(sum(self.Ytarget[:,-1])))
+        #     print("sum(self.Ytarget[:,t-self.initLen-1])): "+str(sum(self.Ytarget[:,t-self.initLen-1])))
+        #     print("sum(self.Ytarget[:,t-self.initLen-1+1])): "+str(sum(self.Ytarget[:,t-self.initLen-1+1])))
+        self.x = np.zeros((self.resSize, 1))
         if self.compute_type == "online":
-            self.Wout = np.zeros((self.inSize,self.resSize+self.inSize+1))
+            self.Wout = np.zeros((self.inSize, self.resSize+self.inSize+1))
         print("done.")
+        if verbose:
+            print("np.shape(self.Ytarget): "+str(np.shape(self.Ytarget)))
 
     def compute_spectral_radius(self):
-        print('Computing spectral radius...',end=" ")
+        print('\nComputing spectral radius...',end=" ")
         rhoW = max(abs(linalg.eig(self.W)[0]))
         print('done.')
         self.W *= self.spectral_radius / rhoW
@@ -136,8 +140,8 @@ class Network(object):
     def run_and_record_network(self) :
         print('Training the network...', end=" ")
         percent = 0.1
-        for t in range(self.trainLen):
-            percent = self.progression(percent, t, self.trainLen)
+        for t in range(self.initAndTrainLen):
+            percent = self.progression(percent, t, self.initAndTrainLen)
             self.u = self.data_b[t%len(self.data)] #%len(self.data) : we return at the beginning of text if we reach the end.
             self.x = (1-self.a)*self.x + self.a*np.tanh( np.dot(self.Win, np.concatenate((np.array([1]),self.u)).reshape(len(self.input_units)+1,1) ) + np.dot( self.W, self.x ) )
             if t >= self.initLen :
@@ -145,12 +149,18 @@ class Network(object):
                 self.X[:,t-self.initLen] = np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]
         print('done.')
 
-    def train_output(self) :
+    def train_offline(self) :
+        print("DEBUG ...start")
         print('Training the output...', end=" ")
         self.X_T = self.X.T
+        print("self.X_T: "+str(self.X_T.shape))
+        print("self.Ytarget: "+str(self.Ytarget.shape))
+        print("np.eye(1+self.inSize+self.resSize): "+str(np.eye(1+self.inSize+self.resSize).shape))
+        #TODO: check why X and Y do not have similar dimensions: self.X_T: (999934, 78) / self.Ytarget: (27, 405743)")
+        print("DEBUG ...end")
         if self.reg is not None:
-            self.Wout = np.dot(np.dot(self.Ytarget,self.X_T), linalg.inv(np.dot(self.X,self.X_T) + \
-                self.reg*np.eye(1+self.inSize+self.resSize) ) )
+            self.Wout = np.dot(np.dot(self.Ytarget,self.X_T), \
+                               linalg.inv(np.dot(self.X,self.X_T) + self.reg*np.eye(1+self.inSize+self.resSize)))
         else:
             self.Wout = np.dot(self.Ytarget, linalg.pinv(self.X) )
         print('done.')
@@ -158,10 +168,10 @@ class Network(object):
     def test(self) :
         print('Testing the network... (', self.mode, ' mode)', sep="", end=" ")
         self.Y = np.zeros((self.outSize,self.testLen))
-        self.u = self.data_b[self.trainLen%len(self.data)]
+        self.u = self.data_b[self.initAndTrainLen%len(self.data)]
         percent = 0.1
         for t in range(self.testLen):
-            percent = self.progression(percent, t, self.trainLen)
+            percent = self.progression(percent, t, self.initAndTrainLen)
             self.x = (1-self.a)*self.x + self.a*np.tanh( np.dot(self.Win, np.concatenate((np.array([1]),self.u)).reshape(len(self.input_units)+1,1)\
                                                        ) + np.dot(self.W,self.x ) )
             self.y = np.dot(self.Wout, np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0] )
@@ -172,7 +182,7 @@ class Network(object):
             elif self.mode == 'prediction':
                 ## predictive mode:
                 self.u = np.zeros(len(self.input_units))
-                self.u[self.data[(self.trainLen+t+1)%len(self.data)]] = 1
+                self.u[self.data[(self.initAndTrainLen+t+1)%len(self.data)]] = 1
             else:
                 raise(Exception, "ERROR: 'mode' was not set correctly.")
         print('done.\n')
@@ -181,7 +191,7 @@ class Network(object):
         print("Computing the error...", end=" ")
         errorLen = self.testLen #500
         #TODO: check if %len(self.data) still works here
-        mse = sum( np.square( self.data[(self.trainLen+1)%len(self.data):(self.trainLen+errorLen+1)%len(self.data)] - self.Y[0,0:errorLen] ) ) / errorLen
+        mse = sum( np.square( self.data[(self.initAndTrainLen+1)%len(self.data):(self.initAndTrainLen+errorLen+1)%len(self.data)] - self.Y[0,0:errorLen] ) ) / errorLen
         print('MSE = ' + str( mse ))
 
     def probabilities(self, i) :
@@ -302,6 +312,75 @@ class Network(object):
 
         return(percent)
 
+    def compute_network(self) :
+        # Launching the different instances to average the performances on different trials
+        for i in range(self.launches) :
+            self.current_launch = i
+            self.initialization()
+            self.compute_spectral_radius()
+            if self.compute_type == "offline" :
+                self.run_and_record_network()
+                self.train_offline()
+            elif self.compute_type == "online" :
+                self.train_online()
+            self.test()
+            self.compute_error()
+            self.convert_output()
+            self.record_output() # save output in a file
+            # TODO: check what is the purpose of this block self.type ==1
+            # if self.type == 1 :
+            #     self.words_list(existing_words=False)
+            #     self.words_list(existing_words=True)
+
+    def train_online(self, verbose=False) :
+        '''Update network variable by applying a LMS algo'''
+        percent = 0.1 # for the progression
+        if verbose:
+            print("len(self.data): "+str(len(self.data)))
+            print("len(self.data_b): "+str(len(self.data_b)))
+        for t in range(self.initAndTrainLen):
+#        for t in range(self.initLen+self.initAndTrainLen+self.testLen):
+            self.u = self.data_b[t%len(self.data)]
+
+            ## update equations of reservoir and output units
+            self.x = (1-self.a)*self.x + self.a*np.tanh( np.dot(self.Win, np.concatenate((np.array([1]),self.u)).reshape(len(self.input_units)+1,1) ) + np.dot( self.W, self.x ) )
+            percent = self.progression(percent, t, self.initAndTrainLen)
+
+            if t >= self.initLen : # we finished the "warming period", the reservoir is warm enough (i.e. the "intial transient states" are gone ...hopefully), we can start to train now!!!
+                # In online mode we do not need to save (i.e. concatenate) all the values of x in X
+#                self.X[:,t-self.initLen] = np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]
+                if verbose:
+                    print("np.concatenate((np.array([1]), self.u, self.x)).shape ", np.concatenate((np.array([1]), self.u, self.x[:,0])).shape)
+                self.y = np.dot(self.Wout, np.concatenate((np.array([1]), self.u, self.x[:,0])))
+#                np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]
+
+                ### compute error and update (reservoir to output) weights
+                ##- compute current error
+                if verbose:
+                    print("self.Wout.shape ", self.Wout.shape)
+#                    print("self.x ", self.x)
+                    print("self.x.shape ", self.x.shape)
+#                    print("self.y ", self.y)
+                    print("self.y.shape ", self.y.shape)
+                    print("corresponding char: ",self.output_units[np.argmax(self.y)])
+#                    print("self.data_b[t+1] ", self.data_b[t+1])
+                    print("self.data_b[t+1].shape ", self.data_b[t+1].shape)
+                    print("corresponding char: ",self.output_units[np.argmax(self.data_b[t+1])])
+                    print("initLen : ", self.initLen, self.initAndTrainLen-self.initLen)
+                err = self.y - self.data_b[t+1] #.reshape(self.inSize,1) #TODO: should be equivalent to: err = self.y - self.Ytarget[t]
+                ##- update reservoir to output weights
+                if verbose:
+                    print("err.shape ", err.shape)
+                    print("err.reshape(self.inSize, 1).shape ", err.reshape(self.inSize, 1).shape)
+                    print("np.concatenate((np.array([1]), self.u, self.x[:,0])).reshape(1, self.resSize+self.inSize+1)).shape ", np.concatenate((np.array([1]), self.u, self.x[:,0])).reshape(1, self.resSize+self.inSize+1).shape)
+#                    print("np.dot(err.reshape(self.inSize, 1), self.x.reshape(1, self.resSize)).shape ", np.dot(err.reshape(self.inSize, 1), self.x.reshape(1, self.resSize)).shape)
+#                self.Wout -= self.learning_rate * np.dot(err.reshape(self.inSize, 1), self.x.reshape(1, self.resSize)) #TODO: check this equation
+                self.Wout -= self.learning_rate * np.dot(err.reshape(self.inSize, 1), np.concatenate((np.array([1]), self.u, self.x[:,0])).reshape(1, self.resSize+self.inSize+1))
+#                np.concatenate((np.array([1]), self.u, self.x))
+                # stop the program if the learning is diverging
+                if np.max(err) > 10**9 or np.max(err)=='nan':
+                    raise(Exception, "LMS error is too big (more than 10**9): "+str(err)+". The algorithm is diverging because of a too high learning rate. You should decrease the learning rate !!!")
+
     def setup_user(self):
         #TYPE AND DATA SETUP
         self.type = 0
@@ -362,12 +441,12 @@ class Network(object):
             print("\nReservoir Size?", end=" ")
             self.resSize = int(input())
 
-        while not 0 < self.trainLen :
+        while not 0 < self.initAndTrainLen :
             print("Training length? (0-", str(len(self.input_text)), ")", sep="", end=" ")
-            self.trainLen = int(input())
+            self.initAndTrainLen = int(input())
 
         while not 0 < self.testLen :
-            print("Testing length? (0-", str(len(self.input_text)-self.trainLen), ")", sep="", end=" ")
+            print("Testing length? (0-", str(len(self.input_text)-self.initAndTrainLen), ")", sep="", end=" ")
             self.testLen = int(input())
 
         probamodes = ["filter0", "filter01", "add_min", "max"]
@@ -385,7 +464,24 @@ class Network(object):
         while self.nb_words <= 0:
             self.nb_words = int(input("\nHow long do you want the words occurences list to be? "))
 
-    def setup(self) :
+    def setup_initLen(self):
+        """ initLen remove the corresponding number of time steps to initAndTrainLen
+
+        auto_adapt_initLen:
+            Adapting initLen to the number of neurons inside the reservoir and the time constant
+            xavier's proposition to set the initial warming-up time for the reservoir
+        """
+        if self.auto_adapt_initLen:
+            self.initLen = int(np.floor(self.resSize/float(self.a)))
+            print("\n", "-"*10, "\nThe warming period of the reservoir (i.e. initLen)",\
+                "have been automatically set to ", str(self.initLen))
+            print("This equation have been used: initLen = np.floor(resSize/a)")
+            print("With resSize =", str(self.resSize), "and (leak rate) a =", str(self.a))
+            print("-"*10)
+        else:
+            self.initLen = 100
+
+    def setup_predef_or_user(self) :
         """ Ask the user if (s)he wants to load the predifined parameters (here below),
             or if (s)he wants to go through a series of questions to parameterize it on the fly (in setup_user())."""
 
@@ -394,98 +490,51 @@ class Network(object):
             print("Use predefined parameters?\n 1. Yes\n 2. No\n > ", end="")
             self.predefined_params = int(input())
 
+        ### Default params in any case
+        #Random seed
+        self.seed = 42 #None #42
+        # Learning parameters
+        self.reg =  1e-8 # ridge regression parameters (for offline learning only for the moment)
+        self.learning_rate = 10**-3#10**-4 #10**-3 # for online learning only
+        # will auto-adapt the initLen to the reservoir size and leak rate (a)
+        self.auto_adapt_initLen = True
+        #Network formula constants :
+        self.a = 0.75 #0.3
+        self.spectral_radius = 1.25 #0.25
+        self.input_scaling = 1.
+
         if self.predefined_params == 1:
             self.type = 1
-            self.file = open("text/HarryPotter1.txt", 'r').read() #open("text/Shakespeare.txt", "r").read()
-            self.mode = 'generative' #'generative'#'prediction'
-            self.compute_type = "offline" #""offline"#"online"
-            self.filter_characters(False, False, False) #(False, True, False) # (keep_upper, keep_punctuation, keep_numbers)
-            self.resSize = 1500#1500 #500 #10**3
-            self.trainLen = 2*10**6 #5*10**5#10**6#10**5 #200000
+            self.file = open("text/Shakespeare.txt", "r").read() #open("text/HarryPotter1.txt", 'r').read() #open("text/Shakespeare.txt", "r").read()
+            self.mode = 'prediction' #'generative'#'prediction'
+            self.compute_type = "online" #""offline"#"online"
+            self.filter_characters(True, True, False) #(False, True, False) # (keep_upper, keep_punctuation, keep_numbers)
+            self.resSize = 100#500#1500 #500 #10**3
+            self.initAndTrainLen = 10**6 #400000#10**6 #5*10**5#10**6#10**5 #200000
             self.testLen = 10**3
-            self.probamode = "filter01" #"filter01" #"max"
+            self.probamode = "max" #"filter01" #"filter01" #"max"
             self.launches = 1
             self.nb_words = 50
         else:
-            setup_user()
+            self.setup_user()
 
-        # Adapting initLen to the number of neurons inside the reservoir and the time constant
-        # xavier's proposition to set the initial warming-up time for the reservoir
-        if self.auto_adapt_initLen:
-            self.initLen = int(np.floor(self.resSize/float(self.a)))
+        self.setup_initLen()
 
+    def _general_setup(self):
+        # #Network mode
+        # self.mode = 'prediction'
+        # self.compute_type = "offline"
 
-    def compute_network(self) :
-        self.setup()
+        # Load params with user or predefined ones
+        self.setup_predef_or_user()
+
+        # Prepare corpus for training data
         if self.type == 1 :
             self.characters()
         if self.type == 2 :
             self.words()
         self.convert_input()
         self.binary_data()
-        for i in range(self.launches) :
-            self.current_launch = i
-            self.initialization()
-            self.compute_spectral_radius()
-            if self.compute_type == "offline" :
-                self.run_and_record_network()
-                self.train_output()
-            elif self.compute_type == "online" :
-                self.train_online()
-            self.test()
-            self.compute_error()
-            self.convert_output()
-            self.record_output() # save output in a file
-            # TODO: check what is the purpose of this block self.type ==1
-            # if self.type == 1 :
-            #     self.words_list(existing_words=False)
-            #     self.words_list(existing_words=True)
-
-    def train_online(self, verbose=False) :
-        '''Update network variable by applying a LMS algo'''
-        percent = 0.1 # for the progression
-        for t in range(self.trainLen):
-#        for t in range(self.initLen+self.trainLen+self.testLen):
-            self.u = self.data_b[t%len(self.data)]
-
-            ## update equations of reservoir and output units
-            self.x = (1-self.a)*self.x + self.a*np.tanh( np.dot(self.Win, np.concatenate((np.array([1]),self.u)).reshape(len(self.input_units)+1,1) ) + np.dot( self.W, self.x ) )
-            percent = self.progression(percent, t, self.trainLen)
-
-            if t >= self.initLen : # we finished the "warming period", the reservoir is warm enough (i.e. the "intial transient states" are gone ...hopefully), we can start to train now!!!
-                # In online mode we do not need to save (i.e. concatenate) all the values of x in X
-#                self.X[:,t-self.initLen] = np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]
-                if verbose:
-                    print("np.concatenate((np.array([1]), self.u, self.x)).shape ", np.concatenate((np.array([1]), self.u, self.x[:,0])).shape)
-                self.y = np.dot(self.Wout, np.concatenate((np.array([1]), self.u, self.x[:,0])))
-#                np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]
-
-                ### compute error and update (reservoir to output) weights
-                ##- compute current error
-                if verbose:
-                    print("self.Wout.shape ", self.Wout.shape)
-#                    print("self.x ", self.x)
-                    print("self.x.shape ", self.x.shape)
-#                    print("self.y ", self.y)
-                    print("self.y.shape ", self.y.shape)
-                    print("corresponding char: ",self.output_units[np.argmax(self.y)])
-#                    print("self.data_b[t+1] ", self.data_b[t+1])
-                    print("self.data_b[t+1].shape ", self.data_b[t+1].shape)
-                    print("corresponding char: ",self.output_units[np.argmax(self.data_b[t+1])])
-                    print("initLen : ", self.initLen, self.trainLen-self.initLen)
-                err = self.y - self.data_b[t+1] #.reshape(self.inSize,1) #TODO: should be equivalent to: err = self.y - self.Ytarget[t]
-                ##- update reservoir to output weights
-                if verbose:
-                    print("err.shape ", err.shape)
-                    print("err.reshape(self.inSize, 1).shape ", err.reshape(self.inSize, 1).shape)
-                    print("np.concatenate((np.array([1]), self.u, self.x[:,0])).reshape(1, self.resSize+self.inSize+1)).shape ", np.concatenate((np.array([1]), self.u, self.x[:,0])).reshape(1, self.resSize+self.inSize+1).shape)
-#                    print("np.dot(err.reshape(self.inSize, 1), self.x.reshape(1, self.resSize)).shape ", np.dot(err.reshape(self.inSize, 1), self.x.reshape(1, self.resSize)).shape)
-#                self.Wout -= self.learning_rate * np.dot(err.reshape(self.inSize, 1), self.x.reshape(1, self.resSize)) #TODO: check this equation
-                self.Wout -= self.learning_rate * np.dot(err.reshape(self.inSize, 1), np.concatenate((np.array([1]), self.u, self.x[:,0])).reshape(1, self.resSize+self.inSize+1))
-#                np.concatenate((np.array([1]), self.u, self.x))
-                # stop the program if the learning is diverging
-                if np.max(err) > 10**9 or np.max(err)=='nan':
-                    raise(Exception, "LMS error is too big (more than 10**9): "+str(err)+". The algorithm is diverging because of a too high learning rate. You should decrease the learning rate !!!")
 
 if __name__ == '__main__':
     nw = Network()
