@@ -340,7 +340,11 @@ class Network(object):
             print("len(self.data_b): "+str(len(self.data_b)))
         for t in range(self.initAndTrainLen):
 #        for t in range(self.initLen+self.initAndTrainLen+self.testLen):
+            print("t:",str(t))
+            print("t%len(self.data):",str(t%len(self.data)))
+            print("t+1%len(self.data):",str(t+1%len(self.data)))
             self.u = self.data_b[t%len(self.data)]
+            _value_to_be_predicted = self.data_b[t+1%len(self.data)]
 
             ## update equations of reservoir and output units
             self.x = (1-self.a)*self.x + self.a*np.tanh( np.dot(self.Win, np.concatenate((np.array([1]),self.u)).reshape(len(self.input_units)+1,1) ) + np.dot( self.W, self.x ) )
@@ -349,8 +353,6 @@ class Network(object):
             if t >= self.initLen : # we finished the "warming period", the reservoir is warm enough (i.e. the "intial transient states" are gone ...hopefully), we can start to train now!!!
                 # In online mode we do not need to save (i.e. concatenate) all the values of x in X
 #                self.X[:,t-self.initLen] = np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]
-                if verbose:
-                    print("np.concatenate((np.array([1]), self.u, self.x)).shape ", np.concatenate((np.array([1]), self.u, self.x[:,0])).shape)
                 self.y = np.dot(self.Wout, np.concatenate((np.array([1]), self.u, self.x[:,0])))
 #                np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]
 
@@ -358,16 +360,19 @@ class Network(object):
                 ##- compute current error
                 if verbose:
                     print("self.Wout.shape ", self.Wout.shape)
-#                    print("self.x ", self.x)
                     print("self.x.shape ", self.x.shape)
-#                    print("self.y ", self.y)
                     print("self.y.shape ", self.y.shape)
                     print("corresponding char: ",self.output_units[np.argmax(self.y)])
-#                    print("self.data_b[t+1] ", self.data_b[t+1])
                     print("self.data_b[t+1].shape ", self.data_b[t+1].shape)
                     print("corresponding char: ",self.output_units[np.argmax(self.data_b[t+1])])
                     print("initLen : ", self.initLen, self.initAndTrainLen-self.initLen)
-                err = self.y - self.data_b[t+1] #.reshape(self.inSize,1) #TODO: should be equivalent to: err = self.y - self.Ytarget[t]
+                # if str(_value_to_be_predicted) == str(self.data_b[(t+1)%len(self.data)]):
+                #     pass
+                # else:
+                #     print("------not same")
+                #     print("_value_to_be_predicted: ",str(_value_to_be_predicted))
+                #     print("self.data_b[(t+1)%len(self.data): ",str(self.data_b[(t+1)%len(self.data)]))
+                err = self.y - self.data_b[(t+1)%len(self.data)] #.reshape(self.inSize,1) #TODO: should be equivalent to: err = self.y - self.Ytarget[t]
                 ##- update reservoir to output weights
                 if verbose:
                     print("err.shape ", err.shape)
@@ -505,12 +510,13 @@ class Network(object):
 
         if self.predefined_params == 1:
             self.type = 1
-            self.file = open("text/Shakespeare.txt", "r").read() #open("text/HarryPotter1.txt", 'r').read() #open("text/Shakespeare.txt", "r").read()
+            self.file = open("text/Little_Red_Riding_Hood.txt", "r").read()  #open("text/Little_Red_Riding_Hood.txt", "r").read() #open("text/HarryPotter1.txt", 'r').read() #open("text/Shakespeare.txt", "r").read()
             self.mode = 'prediction' #'generative'#'prediction'
-            self.compute_type = "online" #""offline"#"online"
+            self.compute_type = "offline" #""offline"#"online"
+            # filter_characters: (keep_upper, keep_punctuation, keep_numbers)
             self.filter_characters(True, True, False) #(False, True, False) # (keep_upper, keep_punctuation, keep_numbers)
-            self.resSize = 100#500#1500 #500 #10**3
-            self.initAndTrainLen = 10**6 #400000#10**6 #5*10**5#10**6#10**5 #200000
+            self.resSize = 2000#500#1500 #500 #10**3
+            self.initAndTrainLen = 10**4 #400000#10**6 #5*10**5#10**6#10**5 #200000
             self.testLen = 10**3
             self.probamode = "max" #"filter01" #"filter01" #"max"
             self.launches = 1
