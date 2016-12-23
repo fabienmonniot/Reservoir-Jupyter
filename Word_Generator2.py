@@ -84,6 +84,7 @@ class Network(object):
         #self.data = np.array([self.input_units.index(i) for i in self.input_text])
         self.inSize = self.outSize = len(self.input_units)
         print("done.")
+        print("Length of input corpus: ", str(len(self.data)), "\n")
 
     def binary_data(self) :
         #TODO: limit size of data_b to the number of characters asked by the user (i.e self.initAndTrainLen = self.testLen)
@@ -499,14 +500,21 @@ class Network(object):
         #Random seed
         self.seed = 42 #None #42
         # Learning parameters
-        self.reg =  1e-8 # ridge regression parameters (for offline learning only for the moment)
+        #   - For OFFLINE learning
+        self.reg =  1e-10 # ridge regression parameters (for offline learning only for the moment)
         self.learning_rate = 10**-3#10**-4 #10**-3 # for online learning only
-        # will auto-adapt the initLen to the reservoir size and leak rate (a)
-        self.auto_adapt_initLen = True
+        #   - For ONLINE learning
         #Network formula constants :
         self.a = 0.75 #0.3
         self.spectral_radius = 1.25 #0.25
         self.input_scaling = 1.
+
+        # Setting the initialization phase (i.e. "warming period" during which the reservoir will not be trained)
+        # If auto_adapt_initLen is True: it will auto-adapt the initLen to the reservoir size and leak rate (a)
+        self.auto_adapt_initLen = True
+        if not self.auto_adapt_initLen:
+            self.initLen = 4419
+        self.setup_initLen()
 
         if self.predefined_params == 1:
             self.type = 1
@@ -516,15 +524,13 @@ class Network(object):
             # filter_characters: (keep_upper, keep_punctuation, keep_numbers)
             self.filter_characters(True, True, False) #(False, True, False) # (keep_upper, keep_punctuation, keep_numbers)
             self.resSize = 2000#500#1500 #500 #10**3
-            self.initAndTrainLen = 10**4 #400000#10**6 #5*10**5#10**6#10**5 #200000
-            self.testLen = 10**3
+            self.initAndTrainLen = self.initLen + 4419 #10**5 #400000#10**6 #5*10**5#10**6#10**5 #200000
+            self.testLen = int(4419/2) #4412 #10**4
             self.probamode = "max" #"filter01" #"filter01" #"max"
             self.launches = 1
             self.nb_words = 50
         else:
             self.setup_user()
-
-        self.setup_initLen()
 
     def _general_setup(self):
         # #Network mode
