@@ -150,15 +150,12 @@ class Network(object):
                 self.X[:,t-self.initLen] = np.concatenate((np.array([1]),self.u,self.x[:,0])).reshape(len(self.input_units)+self.resSize+1,1)[:,0]
         print('done.')
 
-    def train_offline(self) :
-        print("DEBUG ...start")
+    def train_offline(self, verbose=True) :
         print('Training the output...', end=" ")
         self.X_T = self.X.T
-        print("self.X_T: "+str(self.X_T.shape))
-        print("self.Ytarget: "+str(self.Ytarget.shape))
-        print("np.eye(1+self.inSize+self.resSize): "+str(np.eye(1+self.inSize+self.resSize).shape))
-        #TODO: check why X and Y do not have similar dimensions: self.X_T: (999934, 78) / self.Ytarget: (27, 405743)")
-        print("DEBUG ...end")
+        if verbose:
+            print("X_T: "+str(self.X_T.shape))
+            print("Ytarget: "+str(self.Ytarget.shape))
         if self.reg is not None:
             self.Wout = np.dot(np.dot(self.Ytarget,self.X_T), \
                                linalg.inv(np.dot(self.X,self.X_T) + self.reg*np.eye(1+self.inSize+self.resSize)))
@@ -188,12 +185,35 @@ class Network(object):
                 raise(Exception, "ERROR: 'mode' was not set correctly.")
         print('done.\n')
 
-    def compute_error(self) :
+    def compute_error(self, verbose=True) :
         print("Computing the error...", end=" ")
+        ### MSE
         errorLen = self.testLen #500
         #TODO: check if %len(self.data) still works here
-        mse = sum( np.square( self.data[(self.initAndTrainLen+1)%len(self.data):(self.initAndTrainLen+errorLen+1)%len(self.data)] - self.Y[0,0:errorLen] ) ) / errorLen
+        if verbose:
+            print("self.testLen: ", str(self.testLen))
+            print("len(self.data): ", str(len(self.data)))
+            print("start slice for error: ", str((self.initAndTrainLen+1)%len(self.data)))
+            print("start slice for error (without modulo): ", str((self.initAndTrainLen+1)))
+            print("end slice for error: ", str((self.initAndTrainLen+errorLen+1)%len(self.data)))
+            print("end slice for error (without modulo): ", str((self.initAndTrainLen+errorLen+1)))
+        nr_of_pass_on_corpus = (self.initAndTrainLen+errorLen+1 - self.initAndTrainLen+1) / len(self.data)
+        if nr_of_pass_on_corpus > 1:
+            #TODO: solve the problem by extending the vector of data or couting in a loop the error made.
+            print("TODO: solve the problem by extending the vector of data or couting in a loop the error made.")
+        print("nr_of_pass_on_corpus: %f" % nr_of_pass_on_corpus)
+        for i in range(int(np.ceil(nr_of_pass_on_corpus))):
+            print("pass #%d" % (i+1))
+        try:
+            mse = sum( np.square( self.data[(self.initAndTrainLen+1)%len(self.data):(self.initAndTrainLen+errorLen+1)%len(self.data)] - self.Y[0,0:errorLen] ) ) / errorLen
+        except:
+            mse = None
+            print('WARNING: Not able to compute MSE.')
         print('MSE = ' + str( mse ))
+
+        ### output text
+        # TODO: finish next line
+        # out_txt_err =
 
     def probabilities(self, i) :
         """ Provide a vector of probabilities for the character/word output.
@@ -325,8 +345,8 @@ class Network(object):
             elif self.compute_type == "online" :
                 self.train_online()
             self.test()
-            self.compute_error()
             self.convert_output()
+            self.compute_error()
             self.record_output() # save output in a file
             # TODO: check what is the purpose of this block self.type ==1
             # if self.type == 1 :
@@ -498,12 +518,12 @@ class Network(object):
 
         ### Default params in any case
         #Random seed
-        self.seed = 42 #None #42
+        self.seed = None #42 #None #42
         # Learning parameters
         #   - For OFFLINE learning
         self.reg =  1e-10 # ridge regression parameters (for offline learning only for the moment)
-        self.learning_rate = 10**-3#10**-4 #10**-3 # for online learning only
         #   - For ONLINE learning
+        self.learning_rate = 10**-3#10**-4 #10**-3 # for online learning only
         #Network formula constants :
         self.a = 0.75 #0.3
         self.spectral_radius = 1.25 #0.25
@@ -525,7 +545,7 @@ class Network(object):
             self.filter_characters(True, True, False) #(False, True, False) # (keep_upper, keep_punctuation, keep_numbers)
             self.resSize = 2000#500#1500 #500 #10**3
             self.initAndTrainLen = self.initLen + 4419 #10**5 #400000#10**6 #5*10**5#10**6#10**5 #200000
-            self.testLen = int(4419/2) #4412 #10**4
+            self.testLen = 4419 - 2  #4412 #10**4
             self.probamode = "max" #"filter01" #"filter01" #"max"
             self.launches = 1
             self.nb_words = 50
