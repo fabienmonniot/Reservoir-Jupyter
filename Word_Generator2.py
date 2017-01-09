@@ -215,25 +215,33 @@ class Network(object):
         # TODO: finish next line
         # out_txt_err =
 
-    def probabilities(self, i) :
-        """ Provide a vector of probabilities for the character/word output.
-        filter0: replacing x<0 by 0, x within [0,+infinity[
-        filter01: replacing x<0 by 0, replacing x>1 by 1, x within [0,1]
-        add_min: scaling all the outputs such as the min value equals 0, x within [0,+infinity[
-        max: (does nothing to the values, because we will take the maximum value anyway, so we do not need to compute probabilities)
+    def probabilities(self, i, verbose=False) :
+        """ Provide a vector of probabilities for the character/word output, given the filtered output.
+        Different filters are possible:
+            filter0: replacing x<0 by 0, x within [0,+infinity[
+            filter01: replacing x<0 by 0, replacing x>1 by 1, x within [0,1]
+            add_min: scaling all the outputs such as the min value equals 0, x within [0,+infinity[
+            max: (does nothing to the values, because we will take the maximum value anyway, so we do not need to compute probabilities)
         """
+        print("raw output / before filter (min, max, mean) : ", np.min(self.Y.T[i]), np.max(self.Y.T[i]), np.mean(self.Y.T[i]))
         if self.probamode == "filter0" :
-#            proba_weights = abs((self.Y.T[i] > 0)*self.Y.T[i])
             proba_weights = (self.Y.T[i] > 0)*self.Y.T[i] # should work without abs
         elif self.probamode == "filter01" :
-#            proba_weights = abs((self.Y.T[i] > 0)*self.Y.T[i])
-#            proba_weights = proba_weights-((proba_weights > 1)*proba_weights) + (proba_weights > 1)*1
             proba_weights = np.all([(0<=self.Y.T[i]), (self.Y.T[i]<=1)], axis=0)*self.Y.T[i] + (self.Y.T[i]>1)*1.
+            if verbose:
+                # print("proba_weights / after filter01 : ", proba_weights)
+                print("proba_weights / after filter01 (min, max, mean) : ", np.min(proba_weights), np.max(proba_weights), np.mean(proba_weights))
         elif self.probamode == "add_min" :
             proba_weights = (self.Y.T[i]) - np.min(self.Y.T[i])
         elif self.probamode == "max" :
             proba_weights = self.Y.T[i]
+            if verbose:
+                # print("proba_weights / after max : ", proba_weights)
+                print("proba_weights / after max (min, max, mean) : ", np.min(proba_weights), np.max(proba_weights), np.mean(proba_weights))
         proba_weights = proba_weights/sum(proba_weights)
+        if verbose:
+            # print("proba_weights / after global division : ", proba_weights)
+            print("proba_weights / after global division (min, max, mean) : ", np.min(proba_weights), np.max(proba_weights), np.mean(proba_weights))
         return(proba_weights)
 
     def convert_output(self) :
