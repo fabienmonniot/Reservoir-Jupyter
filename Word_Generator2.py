@@ -205,6 +205,14 @@ class Network(object):
         for i in range(int(np.ceil(nr_of_pass_on_corpus))):
             print("pass #%d" % (i+1))
         try:
+            # TODO: check the next line because :
+            # The problem here is that self.data is a vector in which each element corresponds to the index of the character in the self.input_units. On the other hand, self.Y is a matrix of shape (len(self.input_units), testLen), which means that each column of self.Y (which can be written as self.Y[:,x]) is a vector of "probability" of each ouput character for the single input character the we are trying to predict.
+            # The line of code above is trying to find the MSE between the vector self.data[testIndex] and self.Y[0, testIndex]. The latter is the probability of the first character in the self.input_units dict across every input in the test set. That makes no sense to us whatsoever.
+            # For us, the correct implementation of MSE has to compare, for each input, the vector of predicted probability self.Y[:,x].T with the vector of true probability (a zeros-filled vector with a single value 1 at the true character), which is self.data_b[x,:]:
+            # y_true = nw.data_b[(nw.trainLen+1)%len(nw.data):(nw.trainLen+errorLen+1)%len(nw.data),:]
+            #     y_pred = nw.Y[:,0:errorLen].T
+            #     mse = np.mean(np.square(y_true - y_pred))
+            
             mse = sum( np.square( self.data[(self.initAndTrainLen+1)%len(self.data):(self.initAndTrainLen+errorLen+1)%len(self.data)] - self.Y[0,0:errorLen] ) ) / errorLen
         except:
             mse = None
