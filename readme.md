@@ -1,5 +1,5 @@
 # Jupyter notebooks to explain Reservoir Computing
-Reservoir Computing is a framework for training recurrent neural networks.
+Reservoir Computing (RC) is a paradigm for training recurrent neural networks. Echo State Networks (ESNs) is the most famous RC framework: [more info on Echo State Networks](http://www.scholarpedia.org/article/Echo_state_network). This repository is based on ESNs.
 
 ## Install guide
 
@@ -18,8 +18,9 @@ Reservoir Computing is a framework for training recurrent neural networks.
 
 
 ## Run jupyter notebook online
-Cliquer sur ce bouton pour ouvrir les notebooks / Press this button to load notebooks :
+Press this button to load (previous versions of) the notebooks online:
 [![Binder](http://mybinder.org/badge.svg)](http://mybinder.org:/repo/romainpastureau/reservoir-jupyter)
 
+## About
 This repository was first created by @RomainPastureau during his internship with @neuronalX and @rougier at Inria (Research Institute for Mathematics and Computer Science) in Bordeaux, France in June 2016.
 It is now pursued by @neuronalX.
