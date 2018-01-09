@@ -7,23 +7,27 @@ Reservoir Computing (RC) is a paradigm for training recurrent neural networks. E
 - See detailed info here: http://jupyter.readthedocs.io/en/latest/install.html
 - Or, if you do no have Python with scientific librairies installed yet, install Anaconda for Python 3: https://www.anaconda.com/download
 - If you already have Python 3 with scientific librairies (Numpy, Scipy, Matplotlib, ...): Open a terminal (Linux / Mac OS X) and enter the following commands: (no need of "sudo" under Mac OS X)
-```sudo pip3 install --upgrade pip
+```
+sudo pip3 install --upgrade pip
 sudo pip3 install jupyter
 ```
 
 #### Widgets for Jupyter Notebook
 - Enter the following commands in a terminal:
-```sudo pip3 install ipywidgets
+```
+sudo pip3 install ipywidgets
 sudo jupyter nbextension enable --py widgetsnbextension
 ```
 - Details here ipywidgets.readthedocs.io/en/stable/user_install.html
 
 ## Run the notebooks on your computer
 - clone the repository:
-```git clone https://github.com/neuronalX/Reservoir-Jupyter.git
+```
+git clone https://github.com/neuronalX/Reservoir-Jupyter.git
 ```
 - run Jupyter (this opens a Notebook in a browser tab):
-```jupyter notebook
+```
+jupyter notebook
 ```
 - in your browser, select one of the \*.ipynb files to run the corresponding notebook.
 - to begin, start with **Minimal_ESN_-_FR.ipynb** (in French) or **Minimal_ESN_-\_EN.ipynb** (in English).
