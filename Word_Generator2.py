@@ -377,9 +377,10 @@ class Network(object):
             print("len(self.data_b): "+str(len(self.data_b)))
         for t in range(self.initAndTrainLen):
 #        for t in range(self.initLen+self.initAndTrainLen+self.testLen):
-            print("t:",str(t))
-            print("t%len(self.data):",str(t%len(self.data)))
-            print("t+1%len(self.data):",str(t+1%len(self.data)))
+            if verbose:
+                print("t:",str(t))
+                print("t%len(self.data):",str(t%len(self.data)))
+                print("t+1%len(self.data):",str(t+1%len(self.data)))
             self.u = self.data_b[t%len(self.data)]
             _value_to_be_predicted = self.data_b[t+1%len(self.data)]
 
