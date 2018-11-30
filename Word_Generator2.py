@@ -212,7 +212,7 @@ class Network(object):
             # y_true = nw.data_b[(nw.trainLen+1)%len(nw.data):(nw.trainLen+errorLen+1)%len(nw.data),:]
             #     y_pred = nw.Y[:,0:errorLen].T
             #     mse = np.mean(np.square(y_true - y_pred))
-            
+
             mse = sum( np.square( self.data[(self.initAndTrainLen+1)%len(self.data):(self.initAndTrainLen+errorLen+1)%len(self.data)] - self.Y[0,0:errorLen] ) ) / errorLen
         except:
             mse = None
@@ -231,7 +231,7 @@ class Network(object):
             add_min: scaling all the outputs such as the min value equals 0, x within [0,+infinity[
             max: (does nothing to the values, because we will take the maximum value anyway, so we do not need to compute probabilities)
         """
-        print("raw output / before filter (min, max, mean) : ", np.min(self.Y.T[i]), np.max(self.Y.T[i]), np.mean(self.Y.T[i]))
+        # print("raw output / before filter (min, max, mean) : ", np.min(self.Y.T[i]), np.max(self.Y.T[i]), np.mean(self.Y.T[i]))
         if self.probamode == "filter0" :
             proba_weights = (self.Y.T[i] > 0)*self.Y.T[i] # should work without abs
         elif self.probamode == "filter01" :
